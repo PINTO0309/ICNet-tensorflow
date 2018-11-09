@@ -15,11 +15,9 @@ from utils.visualize import decode_labels
 from utils.image_reader import ImageReader, prepare_label
 from utils.pca import pca
 
-sys.path.append("/home/sangwon/Projects/aaf")
-
-from Adaptive_Affinity_Fields.utils import general as aaf_general
-from Adaptive_Affinity_Fields.network.common import layers as nn
-from Adaptive_Affinity_Fields.network.aaf import losses as lossx 
+from utils import general as aaf_general
+from network.common import layers as nn
+from network.aaf import losses as lossx 
 
 def get_arguments():
     parser = argparse.ArgumentParser(description="Reproduced ICNet")
@@ -65,29 +63,34 @@ def create_loss(output, label, num_classes, ignore_label):
     return reduced_loss
 
 def create_losses(net, label, cfg):
-    # Get output from different branches
-    sub4_out = net.layers['sub4_out']
-    sub24_out = net.layers['sub24_out']
-    sub124_out = net.layers['conv6_cls']
-    embedding_out = net.layers['conv3_sub1']
+    with tf.variable_scope('losses'):
+        # Get output from different branches
+        sub4_out = net.layers['sub4_out']
+        sub24_out = net.layers['sub24_out']
+        sub124_out = net.layers['conv6_cls']
+        embedding_out = net.layers['conv3_sub1']
+        
+        with tf.variable_scope('segmentation_loss'):
+            loss_sub4 = create_loss(sub4_out, label, cfg.param['num_classes'], cfg.param['ignore_label'])
+            loss_sub24 = create_loss(sub24_out, label, cfg.param['num_classes'], cfg.param['ignore_label'])
+            loss_sub124 = create_loss(sub124_out, label, cfg.param['num_classes'], cfg.param['ignore_label'])
 
-    loss_sub4 = create_loss(sub4_out, label, cfg.param['num_classes'], cfg.param['ignore_label'])
-    loss_sub24 = create_loss(sub24_out, label, cfg.param['num_classes'], cfg.param['ignore_label'])
-    loss_sub124 = create_loss(sub124_out, label, cfg.param['num_classes'], cfg.param['ignore_label'])
-
-    # Affinity loss
-    kld_margin = 3.0
-    kld_lambda_1 = 1.0
-    kld_lambda_2 = 4.0
-    prob = tf.nn.softmax(embedding_out, dim=-1)
-    edge_loss, not_edge_loss = lossx.affinity_loss(label, prob, cfg.param['num_classes'], kld_margin)
-    aff_loss = tf.reduce_mean(edge_loss)*kld_lambda_1
-    aff_loss += tf.reduce_mean(not_edge_loss)*kld_lambda_2
-
-    l2_losses = [cfg.WEIGHT_DECAY * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
-    
-    # Calculate weighted loss of three branches, you can tune LAMBDA values to get better results.
-    reduced_loss = cfg.LAMBDA1 * loss_sub4 +  cfg.LAMBDA2 * loss_sub24 + cfg.LAMBDA3 * loss_sub124 + tf.add_n(l2_losses) + aff_loss
+        # Affinity loss
+        with tf.variable_scope('affinity_loss'):
+            kld_margin = 3.0
+            kld_lambda_1 = 1.0
+            kld_lambda_2 = 4.0
+            prob = tf.nn.softmax(embedding_out, dim=-1, name='embedding_to_prob')
+            with tf.variable_scope('calc_affinity_loss'):
+                edge_loss, not_edge_loss = lossx.affinity_loss(label, prob, cfg.param['num_classes'], kld_margin)
+            aff_loss = tf.reduce_mean(edge_loss, name='mean_of_edge_loss')*kld_lambda_1
+            aff_loss += tf.reduce_mean(not_edge_loss, name='mean_of_not_edge_loss')*kld_lambda_2
+        
+        with tf.variable_scope('l2_loss'):
+            l2_losses = [cfg.WEIGHT_DECAY * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
+        
+        # Calculate weighted loss of three branches, you can tune LAMBDA values to get better results.
+        reduced_loss = cfg.LAMBDA1 * loss_sub4 +  cfg.LAMBDA2 * loss_sub24 + cfg.LAMBDA3 * loss_sub124 + tf.add_n(l2_losses) + aff_loss
 
     return loss_sub4, loss_sub24, loss_sub124, aff_loss, reduced_loss
 
@@ -127,7 +130,8 @@ def main():
 
     # Setup training network and training samples
     train_reader = ImageReader(cfg=cfg, mode='train')
-    train_net = ICNet_BN(image_reader=train_reader, 
+    with tf.variable_scope('train_net'):
+        train_net = ICNet_BN(image_reader=train_reader, 
                             cfg=cfg, mode='train')
 
     loss_sub4, loss_sub24, loss_sub124, aff_loss, reduced_loss = create_losses(train_net, train_net.labels, cfg)
@@ -154,59 +158,65 @@ def main():
     
     # Process for visualization.
     with tf.device('/cpu:0'):
-        # Image summary for input image, ground-truth label and prediction.
-        image_batch = train_net.images
-        label_batch = train_net.labels
-        seg_outputs = train_net.layers['conv6_cls']
-        aaf_outputs = train_net.layers['conv3_sub1']
-        num_classes = cfg.param['num_classes']
+        with tf.variable_scope('visualization'):
+            # Image summary for input image, ground-truth label and prediction.
+            image_batch = train_net.images
+            label_batch = train_net.labels
+            seg_outputs = train_net.layers['conv6_cls']
+            aaf_outputs = train_net.layers['conv3_sub1']
+            num_classes = cfg.param['num_classes']
 
-        # visualize semantic segmentation output
-        output_vis = tf.image.resize_nearest_neighbor(
-            seg_outputs, tf.shape(image_batch)[1:3,])
-        output_vis = tf.argmax(output_vis, axis=3)
-        output_vis = tf.expand_dims(output_vis, dim=3)
-        output_vis = tf.cast(output_vis, dtype=tf.uint8)
+            # visualize semantic segmentation output
+            output_vis = tf.image.resize_nearest_neighbor(
+                seg_outputs, tf.shape(image_batch)[1:3,])
+            output_vis = tf.argmax(output_vis, axis=3)
+            output_vis = tf.expand_dims(output_vis, dim=3)
+            output_vis = tf.cast(output_vis, dtype=tf.uint8)
+            
+            # visualize instance embedding output
+            aaf_vis = pca(aaf_outputs, 3)
+            aaf_vis = tf.image.resize_nearest_neighbor(
+                aaf_vis, tf.shape(image_batch)[1:3,])
+            aaf_vis = tf.quantize(aaf_vis, 
+                                min_range=tf.reduce_min(aaf_vis),
+                                max_range=tf.reduce_max(aaf_vis),
+                                T=tf.quint8)
+            aaf_summary = tf.cast(aaf_vis.output, dtype=tf.uint8)
+
+            labels_vis = tf.cast(label_batch, dtype=tf.uint8)
         
-        # visualize instance embedding output
-        aaf_vis = pca(aaf_outputs, 3)
-        aaf_vis = tf.image.resize_nearest_neighbor(
-            aaf_vis, tf.shape(image_batch)[1:3,])
-        aaf_summary = tf.cast(aaf_vis, dtype=tf.uint8)
+            in_summary = tf.py_func(
+                aaf_general.inv_preprocess,
+                [image_batch, cfg.IMG_MEAN],
+                tf.uint8)
+            gt_summary = tf.py_func(
+                aaf_general.decode_labels,
+                [labels_vis, num_classes],
+                tf.uint8)
+            out_summary = tf.py_func(
+                aaf_general.decode_labels,
+                [output_vis, num_classes],
+                tf.uint8)
+            # Concatenate image summaries in a row.
+            total_summary = tf.summary.image(
+                'images', 
+                tf.concat(axis=2, values=[in_summary, gt_summary, out_summary, aaf_summary]), 
+                max_outputs=cfg.BATCH_SIZE)
 
-        labels_vis = tf.cast(label_batch, dtype=tf.uint8)
-    
-        in_summary = tf.py_func(
-            aaf_general.inv_preprocess,
-            [image_batch, cfg.IMG_MEAN],
-            tf.uint8)
-        gt_summary = tf.py_func(
-            aaf_general.decode_labels,
-            [labels_vis, num_classes],
-            tf.uint8)
-        out_summary = tf.py_func(
-            aaf_general.decode_labels,
-            [output_vis, num_classes],
-            tf.uint8)
-        # Concatenate image summaries in a row.
-        total_summary = tf.summary.image(
-            'images', 
-            tf.concat(axis=2, values=[in_summary, gt_summary, out_summary, aaf_summary]), 
-            max_outputs=cfg.BATCH_SIZE)
+            # Scalar summary for different loss terms.
+            seg_loss_summary = tf.summary.scalar(
+                'seg_loss', loss_sub124)
+            aff_loss_summary = tf.summary.scalar(
+                'aff_loss', aff_loss)
+            total_summary = tf.summary.merge_all()
 
-        # Scalar summary for different loss terms.
-        seg_loss_summary = tf.summary.scalar(
-            'seg_loss', loss_sub124)
-        aff_loss_summary = tf.summary.scalar(
-            'aff_loss', aff_loss)
-        total_summary = tf.summary.merge_all()
-
-        summary_writer = tf.summary.FileWriter(cfg.SNAPSHOT_DIR,
-                                            graph=tf.get_default_graph())
+            summary_writer = tf.summary.FileWriter(cfg.SNAPSHOT_DIR,
+                                                graph=tf.get_default_graph())
 
     # Create session & restore weights (Here we only need to use train_net to create session since we reuse it)
-    train_net.create_session()
-    train_net.restore(cfg.model_weight, restore_var)
+    with tf.variable_scope('train_net'):
+        train_net.create_session()
+        train_net.restore(cfg.model_weight, restore_var)
     saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=5)
 
     # Iterate over training steps.
@@ -224,7 +234,8 @@ def main():
             loss_value, loss1, loss2, loss3, loss4, _ = train_net.sess.run(sess_outs, feed_dict=feed_dict)            
 
         duration = time.time() - start_time
-        print('step {:d} \t total loss = {:.3f}, sub4 = {:.3f}, sub24 = {:.3f}, sub124 = {:.3f}, aff_loss= {:.3f} ({:.3f} sec/step)'.\
+        if step % 10 == 0:
+            print('step {:d} \t total loss = {:.3f}, sub4 = {:.3f}, sub24 = {:.3f}, sub124 = {:.3f}, aff_loss= {:.3f} ({:.3f} sec/step)'.\
                     format(step, loss_value, loss1, loss2, loss3, loss4, duration))
     
     
