@@ -29,47 +29,54 @@ def affinity_loss(labels,
   Returns:
     Two 1-D tensors value indicating the loss at edge and non-edge.
   """
+  # Resize labels
+  with tf.variable_scope('resize_labels'):
+    labels = tf.image.resize_nearest_neighbor(labels, size=tf.shape(probs)[1:3])
+    
   # Compute ignore map (e.g, label of 255 and their paired pixels).
-  labels = tf.squeeze(labels, axis=-1) # NxHxW
-  ignore = nnx.ignores_from_label(labels, num_classes, 1) # NxHxWx8
-  not_ignore = tf.logical_not(ignore)
-  not_ignore = tf.expand_dims(not_ignore, axis=3) # NxHxWx1x8
+  with tf.variable_scope('compute_ignore_map'):
+    labels_sq = tf.squeeze(labels, axis=-1) # NxHxW
+    ignore = nnx.ignores_from_label(labels_sq, num_classes, 1) # NxHxWx8
+    not_ignore = tf.logical_not(ignore)
+    not_ignore = tf.expand_dims(not_ignore, axis=3) # NxHxWx1x8
 
   # Compute edge map.
-  one_hot_lab = tf.one_hot(labels, depth=num_classes)
-  edge = nnx.edges_from_label(one_hot_lab, 1, 255) # NxHxWxCx8
+  with tf.variable_scope('compute_edge_map'):
+    edge = nnx.edges_from_label(labels, 1, 255) # NxHxWx1x8
 
   # Remove ignored pixels from the edge/non-edge.
-  edge = tf.logical_and(edge, not_ignore)
-  not_edge = tf.logical_and(tf.logical_not(edge), not_ignore)
+  with tf.variable_scope('remove_ignored_pixels'):
+    edge = tf.logical_and(edge, not_ignore)
+    not_edge = tf.logical_and(tf.logical_not(edge), not_ignore)
 
-  edge_indices = tf.where(tf.reshape(edge, [-1]))
-  not_edge_indices = tf.where(tf.reshape(not_edge, [-1]))
 
   # Extract eight corner from the center in a patch as paired pixels.
-  probs_paired = nnx.eightcorner_activation(probs, 1)  # NxHxWxCx8
-  probs = tf.expand_dims(probs, axis=-1) # NxHxWxCx1
-  bot_epsilon = tf.constant(1e-4, name='bot_epsilon')
-  top_epsilon = tf.constant(1.0, name='top_epsilon')
-  neg_probs = tf.clip_by_value(
-      1-probs, bot_epsilon, top_epsilon)
-  probs = tf.clip_by_value(
-      probs, bot_epsilon, top_epsilon)
-  neg_probs_paired= tf.clip_by_value(
-      1-probs_paired, bot_epsilon, top_epsilon)
-  probs_paired = tf.clip_by_value(
-    probs_paired, bot_epsilon, top_epsilon)
+  with tf.variable_scope('extract_eight_corner'):
+    probs_paired = nnx.eightcorner_activation(probs, 1)  # NxHxWxCx8
+    probs = tf.expand_dims(probs, axis=-1) # NxHxWxCx1
+    bot_epsilon = tf.constant(1e-4, name='bot_epsilon')
+    top_epsilon = tf.constant(1.0, name='top_epsilon')
+    probs = tf.clip_by_value(
+        probs, bot_epsilon, top_epsilon,name='probs')
+    probs_paired = tf.clip_by_value(
+      probs_paired, bot_epsilon, top_epsilon, name='probs_paired')
 
   # Compute KL-Divergence.
-  kldiv = probs_paired*tf.log(probs_paired/probs)
-  kldiv += neg_probs_paired*tf.log(neg_probs_paired/neg_probs)
-  not_edge_loss = kldiv
-  edge_loss = tf.maximum(0.0, kld_margin-kldiv)
+  with tf.variable_scope('compute_kl_divergence'):
+    kldiv = tf.reduce_mean(probs_paired*tf.log(probs_paired/probs),
+                           axis=3, keepdims=True)
 
-  not_edge_loss = tf.reshape(not_edge_loss, [-1])
-  not_edge_loss = tf.gather(not_edge_loss, not_edge_indices)
-  edge_loss = tf.reshape(edge_loss, [-1])
-  edge_loss = tf.gather(edge_loss, edge_indices)
+  with tf.variable_scope('compute_not_edge_loss'):
+    not_edge_loss = kldiv
+    not_edge_loss = tf.reshape(not_edge_loss, [-1])
+    not_edge_indices = tf.where(tf.reshape(not_edge, [-1]))
+    not_edge_loss = tf.gather(not_edge_loss, not_edge_indices)
+
+  with tf.variable_scope('compute_edge_loss'):
+    edge_loss = tf.maximum(0.0, kld_margin-kldiv)
+    edge_loss = tf.reshape(edge_loss, [-1])
+    edge_indices = tf.where(tf.reshape(edge, [-1]))
+    edge_loss = tf.gather(edge_loss, edge_indices)
 
   return edge_loss, not_edge_loss
 
