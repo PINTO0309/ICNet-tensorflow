@@ -23,7 +23,7 @@
   
 ## Environment Setup <a name="environment"></a>
 ```
-pip install tensorflow-gpu opencv-python jupyter matplotlib tqdm
+pip3 install tensorflow-gpu opencv-python jupyter matplotlib tqdm googledrivedownloader
 ```
 
 ## Download Weights <a name="download-weights"></a>
