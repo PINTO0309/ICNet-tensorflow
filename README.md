@@ -30,7 +30,7 @@ pip3 install tensorflow-gpu opencv-python jupyter matplotlib tqdm googledrivedow
 We provide pre-trained weights for [cityscapes](https://www.cityscapes-dataset.com/) and [ADE20k](http://sceneparsing.csail.mit.edu/) dataset. You can download the weights easily use following command,
 
 ```
-python script/download_weights.py --dataset cityscapes (or ade20k)
+python3 script/download_weights.py --dataset cityscapes (or ade20k)
 ```
 
 ## Download Dataset (Optional) <a name="download-dataset"></a>
@@ -85,7 +85,7 @@ Perform in single-scaled model on the cityscapes validation dataset. (We have su
 
 Run following command to get evaluation results,
 ```
-python evaluate.py --dataset=cityscapes --filter-scale=1 --model=trainval
+python3 evaluate.py --dataset=cityscapes --filter-scale=1 --model=trainval
 ```
 
 List of Args:
@@ -100,7 +100,7 @@ List of Args:
 Reach **32.25%mIoU** on ADE20k validation set.
 
 ```
-python evaluate.py --dataset=ade20k --filter-scale=2 --model=others
+python3 evaluate.py --dataset=ade20k --filter-scale=2 --model=others
 ```
 > Note: to use model provided by us, set `filter-scale` to 2.
 
