@@ -146,7 +146,7 @@ class TrainConfig(Config):
 
 **3.** Run following command and **decide whether to update mean/var or train beta/gamma variable**.
 ```
-python train.py --update-mean-var --train-beta-gamma \
+python3 train.py --update-mean-var --train-beta-gamma \
       --random-scale --random-mirror --dataset cityscapes --filter-scale 1
 ```
 
