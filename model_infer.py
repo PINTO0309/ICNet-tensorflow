@@ -22,13 +22,13 @@ class ICNet(Network):
 
         elif mode == 'inference':
             # Create placeholder and pre-process here.
-            self.img_placeholder = tf.placeholder(dtype=tf.float32, shape=cfg.INFER_SIZE, name="input")
-            self.images, self.o_shape, self.n_shape = _infer_preprocess(self.img_placeholder)
+            self.images = tf.placeholder(dtype=tf.float32, shape=cfg.INFER_SIZE, name="input")
+            #self.images, self.o_shape, self.n_shape = _infer_preprocess(self.img_placeholder)
             
             super().__init__(inputs={'data': self.images}, cfg=self.cfg)
 
             self.output = self.get_output_node()
-            print("input=", self.img_placeholder.name)
+            print("input=", self.images.name)
             print("output=", self.output.name)
 
     def get_output_node(self):
