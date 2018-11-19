@@ -55,6 +55,8 @@ class Network(object):
         # If true, the resulting variables are set as trainable
         self.is_training = cfg.is_training
 
+        self.loader = None
+
         self.setup()
 
     def setup(self, is_training):
@@ -75,12 +77,16 @@ class Network(object):
     def restore(self, data_path, var_list=None):
         if data_path.endswith('.npy'):
             self.load_npy(data_path, self.sess)
+            self.loader = tf.train.Saver(var_list=tf.global_variables())
         else:
-            loader = tf.train.Saver(var_list=tf.global_variables())
-            loader.restore(self.sess, data_path)
+            self.loader = tf.train.Saver(var_list=tf.global_variables())
+            self.loader.restore(self.sess, data_path)
         
         print('Restore from {}'.format(data_path))
     
+    def get_loader(self):
+        return self.loader
+
     def save(self, saver, save_dir, step):
         model_name = 'model.ckpt'
         checkpoint_path = os.path.join(save_dir, model_name)

@@ -1,0 +1,9 @@
+python3 freeze_graph.py \
+--input_graph=snapshots/semanticsegmentation_ICNet.pbtxt \
+--input_checkpoint=snapshots/model.ckpt-90000 \
+--output_graph=snapshots/semanticsegmentation_ICNet.pb \
+--output_node_names=conv6_cls/BiasAdd \
+--input_binary=False
+
+
+

@@ -1,0 +1,4 @@
+input= input:0
+output= conv6_cls/BiasAdd:0
+
+INFER_SIZE (256, 512, 3)

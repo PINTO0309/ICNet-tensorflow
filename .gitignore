@@ -3,7 +3,10 @@ __pycache__/
 ADEChallengeData2016
 cityscapes_dataset
 checkpoint
-*.npy
-model.ckpt-*
 
-snapshots/*
+model/ade20k/
+icnet_cityscapes_train_30k.npy
+icnet_cityscapes_train_30k_bnnomerge.npy
+icnet_cityscapes_trainval_90k_bnnomerge.npy
+BK*
+config.py

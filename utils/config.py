@@ -3,7 +3,7 @@ import os
 
 class Config(object):
     # Setting dataset directory
-    CITYSCAPES_DATA_DIR = './data/cityscapes_dataset/cityscape/'
+    CITYSCAPES_DATA_DIR = '/home/b920405/git/ENet/Cityscapes/'
     ADE20K_DATA_DIR = './data/ADEChallengeData2016/'
       
     ADE20K_eval_list = os.path.join('./data/list/ade20k_val_list.txt')
