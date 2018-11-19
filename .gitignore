@@ -2,7 +2,6 @@ __pycache__/
 .ipynb_checkpoints/
 ADEChallengeData2016
 cityscapes_dataset
-checkpoint
 
 model/ade20k/
 icnet_cityscapes_train_30k.npy
