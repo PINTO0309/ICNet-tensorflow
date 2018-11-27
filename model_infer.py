@@ -1,7 +1,7 @@
 import tensorflow as tf
 from networks import Network
 from utils.image_reader import _infer_preprocess
-from utils.visualize import decode_labels
+from utils.visualize import decode_labels_infer
 
 class ICNet(Network):
     def __init__(self, cfg, mode, image_reader=None):
@@ -22,14 +22,12 @@ class ICNet(Network):
 
         elif mode == 'inference':
             # Create placeholder and pre-process here.
-            self.images = tf.placeholder(dtype=tf.float32, shape=cfg.INFER_SIZE, name="input")
-            #self.images, self.o_shape, self.n_shape = _infer_preprocess(self.img_placeholder)
+            self.img_placeholder = tf.placeholder(dtype=tf.float32, shape=cfg.INFER_SIZE)
+            self.images, self.o_shape, self.n_shape = _infer_preprocess(self.img_placeholder)
             
             super().__init__(inputs={'data': self.images}, cfg=self.cfg)
 
             self.output = self.get_output_node()
-            print("input=", self.images.name)
-            print("output=", self.output.name)
 
     def get_output_node(self):
         if self.mode == 'inference':
@@ -37,13 +35,11 @@ class ICNet(Network):
             logits = self.layers['conv6_cls']
 
             # Upscale the logits and decode prediction to get final result.
-            #logits_up = tf.image.resize_bilinear(logits, size=self.n_shape, align_corners=True)
-            #logits_up = tf.image.crop_to_bounding_box(logits_up, 0, 0, self.o_shape[0], self.o_shape[1])
+            logits_up = tf.image.resize_bilinear(logits, size=self.n_shape, align_corners=True)
+            logits_up = tf.image.crop_to_bounding_box(logits_up, 0, 0, self.o_shape[0], self.o_shape[1])
 
-            #output_classes = tf.argmax(logits_up, axis=3)
-            #output = decode_labels(output_classes, self.o_shape, self.cfg.param['num_classes'])
-
-            output = logits
+            output_classes = tf.cast(tf.argmax(logits_up, axis=3), tf.int32)
+            output = decode_labels_infer(output_classes, self.o_shape, self.cfg.param['num_classes'])
 
         elif self.mode == 'eval':
             logits = self.layers['conv6_cls']

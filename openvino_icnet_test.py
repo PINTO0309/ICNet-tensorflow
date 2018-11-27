@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import sys
 import cv2
 import numpy as np
@@ -18,22 +16,18 @@ camera_height = 240
 fps = ""
 elapsedTime = 0
 
-plugin = IEPlugin(device="HETERO:MYRIAD,CPU")
-plugin.set_config({"TARGET_FALLBACK": "HETERO:MYRIAD,CPU"})
-plugin.set_initial_affinity(net)
+#plugin = IEPlugin(device="HETERO:MYRIAD,CPU")
+#plugin.set_config({"TARGET_FALLBACK": "HETERO:MYRIAD,CPU"})
+#plugin.set_initial_affinity(net)
 
 #plugin = IEPlugin(device="MYRIAD")
-#plugin = IEPlugin(device="CPU")
+plugin = IEPlugin(device="CPU")
 
-for l in net.layers.values():
-    if l.type == "Interp":
-        l.affinity = "CPU"
-
-plugin.add_cpu_extension("/usr/local/lib/libtensorflow_call_layer.so")
+plugin.add_cpu_extension("/home/alpha/inference_engine_samples_build/intel64/Release/lib/libcpu_extension.so")
 exec_net = plugin.load(network=net)
 
 input_blob = next(iter(net.inputs))        #input_blob = 'input'
-out_blob   = next(iter(net.outputs))       #out_blob   = 'conv6_cls/BiasAdd'
+out_blob   = next(iter(net.outputs))       #out_blob   = 'Reshape_1'
 n, c, h, w = net.inputs[input_blob].shape  #n, c, h, w = 1, 3, 256, 512
 
 del net
@@ -50,31 +44,24 @@ while cap.isOpened():
     #if not ret:
     #    break
     frame = cv2.imread('data/input/000003.jpg')
-    prepimg = frame[:, :, ::-1].copy()
-    #prepimg = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    prepimg = Image.fromarray(prepimg)
-    prepimg = prepimg.resize((256, 512), Image.ANTIALIAS)
-    prepimg = np.asarray(prepimg) / 255.0
+    prepimg = cv2.resize(frame, (512, 256))
     prepimg = prepimg.transpose((2, 0, 1)).reshape((1, c, h, w))
+    print(prepimg.shape)
 
     t2 = time.perf_counter()
     exec_net.start_async(request_id=0, inputs={input_blob: prepimg})
 
     if exec_net.requests[0].wait(-1) == 0:
-        outputs = exec_net.requests[0].outputs[out_blob] # (1, 3, 256, 512)
+        outputs = exec_net.requests[0].outputs[out_blob] # (1, 256, 512, 3)
+
+        print(outputs[0].shape)
         print("SegmentationTime = {:.7f}".format(time.perf_counter() - t2))
-        outputs = outputs.transpose((2, 3, 1, 0)).reshape((h, w, c)) # (256, 512 3)
-        outputs = cv2.resize(outputs, (camera_width, camera_height)) # (240, 320, 3)
+        outputs = outputs[0] # (256, 512, 3)
+        image = cv2.resize(outputs, (camera_width, camera_height)) # (320, 240, 3)
 
         # View
-        res = np.argmax(outputs, axis=2)
-        image = Image.fromarray(np.uint8(res), mode="P")
-        image.putpalette(palette)
-        image = image.convert("RGB")
-
-        image = np.asarray(image)
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        image = cv2.addWeighted(frame, 1, image, 0.9, 0)
+        image = image[:, :, ::-1].copy()
+        image = 0.5 * frame + 0.5 * image
 
     cv2.putText(image, fps, (camera_width-180,15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (38,0,255), 1, cv2.LINE_AA)
     cv2.imshow("Result", image)
