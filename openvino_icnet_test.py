@@ -52,7 +52,7 @@ while cap.isOpened():
     exec_net.start_async(request_id=0, inputs={input_blob: prepimg})
 
     if exec_net.requests[0].wait(-1) == 0:
-        outputs = exec_net.requests[0].outputs[out_blob] # (1, 256, 512, 3)
+        outputs = exec_net.requests[0].outputs[out_blob] # (1, 256, 512, 19)
 
         print(outputs[0].shape)
         print("SegmentationTime = {:.7f}".format(time.perf_counter() - t2))
