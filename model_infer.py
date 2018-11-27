@@ -35,7 +35,7 @@ class ICNet(Network):
             logits = self.layers['conv6_cls']
 
             # Upscale the logits and decode prediction to get final result.
-            logits_up = tf.image.resize_bilinear(logits, size=self.n_shape, align_corners=True)
+            logits_up = tf.image.resize_bilinear(logits, size=self.n_shape, align_corners=True, name="input")
             logits_up = tf.image.crop_to_bounding_box(logits_up, 0, 0, self.o_shape[0], self.o_shape[1])
 
             output_classes = tf.cast(tf.argmax(logits_up, axis=3), tf.int32)
