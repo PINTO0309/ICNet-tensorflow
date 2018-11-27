@@ -1,7 +1,7 @@
 import tensorflow as tf
 from networks import Network
 from utils.image_reader import _infer_preprocess
-from utils.visualize import decode_labels_infer
+from utils.visualize import decode_labels
 
 class ICNet(Network):
     def __init__(self, cfg, mode, image_reader=None):
@@ -38,8 +38,10 @@ class ICNet(Network):
             logits_up = tf.image.resize_bilinear(logits, size=self.n_shape, align_corners=True)
             logits_up = tf.image.crop_to_bounding_box(logits_up, 0, 0, self.o_shape[0], self.o_shape[1])
 
-            output_classes = tf.cast(tf.argmax(logits_up, axis=3), tf.int32)
-            output = decode_labels_infer(output_classes, self.o_shape, self.cfg.param['num_classes'])
+            #output_classes = tf.argmax(logits_up, axis=3)
+            #output = decode_labels(output_classes, self.o_shape, self.cfg.param['num_classes'])
+            ##output = tf.reshape(output_classes, (1, self.o_shape[0], self.o_shape[1], 3))
+            output = logits_up
 
         elif self.mode == 'eval':
             logits = self.layers['conv6_cls']
