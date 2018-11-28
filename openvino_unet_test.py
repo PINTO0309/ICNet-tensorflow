@@ -43,7 +43,6 @@ while cap.isOpened():
         break
     #frame = cv2.imread('data/input/000003.jpg')
     prepimg = frame[:, :, ::-1].copy()
-    #prepimg = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     prepimg = Image.fromarray(prepimg)
     prepimg = prepimg.resize((256, 256), Image.ANTIALIAS)
     prepimg = np.asarray(prepimg) / 255.0
