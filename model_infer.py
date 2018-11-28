@@ -25,7 +25,7 @@ class ICNet(Network):
             self.img_placeholder = tf.placeholder(dtype=tf.float32, shape=cfg.INFER_SIZE, name="input")
             self.images, self.o_shape, self.n_shape = _infer_preprocess(self.img_placeholder)
             
-            super().__init__(inputs={'data': self.images}, cfg=self.cfg)
+            super(ICNet, self).__init__(inputs={'data': self.images}, cfg=self.cfg)
 
             self.output = self.get_output_node()
 
@@ -36,7 +36,7 @@ class ICNet(Network):
 
             # Upscale the logits and decode prediction to get final result.
             logits_up = tf.image.resize_bilinear(logits, size=self.n_shape, align_corners=True)
-            logits_up = tf.image.crop_to_bounding_box(logits_up, 0, 0, self.o_shape[0], self.o_shape[1])
+            #logits_up = tf.image.crop_to_bounding_box(logits_up, 0, 0, self.o_shape[0], self.o_shape[1])
 
             #output_classes = tf.argmax(logits_up, axis=3)
             #output = decode_labels(output_classes, self.o_shape, self.cfg.param['num_classes'])

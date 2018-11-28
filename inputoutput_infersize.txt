@@ -1,3 +1,3 @@
 input= input:0
-output= crop_to_bounding_box/Slice:0
-INFER_SIZE (1, 256, 512, 19)
+output= ResizeBilinear_19:0
+INFER_SIZE (1, 19, 256, 512)
